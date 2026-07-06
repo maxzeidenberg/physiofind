@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PhysioFind – Find Physical Therapy Near You</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 240'%3E%3Cpath d='M90 4C139 4 179 44 179 93 179 154 90 234 90 234 90 234 1 154 1 93 1 44 41 4 90 4Z' fill='%231F4A37'/%3E%3Ccircle cx='90' cy='90' r='60' fill='%23fff'/%3E%3Ccircle cx='82' cy='52' r='12' fill='%231F4A37'/%3E%3Cg fill='none' stroke='%231F4A37' stroke-width='11' stroke-linecap='round'%3E%3Cpath d='M76 70L98 96'/%3E%3Cpath d='M98 78L119 70'/%3E%3Cpath d='M84 76L66 84'/%3E%3Cpath d='M98 96L112 122'/%3E%3Cpath d='M98 96L74 116'/%3E%3C/g%3E%3C/svg%3E" />
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F4F7F5; color: #152420; font-family: 'Source Sans 3', system-ui, sans-serif; }
+  input { outline: none; font-family: inherit; }
+  input:focus, button:focus-visible, a:focus-visible { box-shadow: 0 0 0 3px rgba(46,107,79,.35); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState } = React;
+
+// ========================================================================
+//  PASTE YOUR GOOGLE API KEY BETWEEN THE QUOTES BELOW.
+//  (Instructions are in the setup guide. Restrict the key to physiofind.app
+//   in Google Cloud Console so it can only be used on your site.)
+// ========================================================================
+const GOOGLE_API_KEY = "PASTE_YOUR_KEY_HERE";
+// ========================================================================
+
+const T = { ink:"#152420", pine:"#2E6B4F", pineDark:"#1F4A37", bg:"#F4F7F5", amber:"#B47816", amberBg:"#FBF3E2", line:"#DCE5E0", sub:"#5C6B64" };
+const FONT = "'Sora', system-ui, sans-serif";
+
+const INSURANCES = ["Medicare","Medicaid","Blue Cross Blue Shield","Aetna","UnitedHealthcare","Cigna","Humana","Kaiser Permanente"];
+const CALL_SCRIPT = [
+  "Do you accept my insurance? (Give the exact plan name on your card.)",
+  "Is there a copay per visit, and do I need prior authorization?",
+  "Do you have any openings in the next 1-2 weeks?",
+  "Do you need a referral or prescription faxed? What is your fax number?",
+  "How long is the first evaluation visit?",
+];
+
+const params = new URLSearchParams(window.location.search);
+const PROVIDER_NAME = params.get("provider") || "your provider's office";
+const PARTNER_NETWORKS = (params.get("partners") || "").split(",").map(s => s.trim()).filter(Boolean);
+const isPreferred = (c) => PARTNER_NETWORKS.some(net => c.name.toLowerCase().includes(net.toLowerCase()));
+
+function App() {
+  const [step, setStep] = useState(1);
+  const [zip, setZip] = useState("");
+  const [insurance, setInsurance] = useState("");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [clinics, setClinics] = useState([]);
+  const [chosen, setChosen] = useState(null);
+  const [manualName, setManualName] = useState("");
+  const [apptDate, setApptDate] = useState("");
+  const [faxNumber, setFaxNumber] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const preferred = clinics.filter(isPreferred);
+  const others = clinics.filter(c => !isPreferred(c));
+
+  async function findClinics() {
+    if (!/^\d{5}$/.test(zip.trim())) { setError("Enter a 5-digit ZIP code."); return; }
+    setError(""); setLoading(true);
+    try {
+      const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": GOOGLE_API_KEY,
+          "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.regularOpeningHours.weekdayDescriptions,places.rating,places.userRatingCount",
+        },
+        body: JSON.stringify({ textQuery: "outpatient physical therapy clinic near " + zip.trim(), maxResultCount: 12 }),
+      });
+      if (!res.ok) { setError("Clinic lookup failed. Double-check the ZIP and try again."); return; }
+      const data = await res.json();
+      const list = (data.places || []).map(p => ({
+        name: p.displayName?.text || "",
+        address: p.formattedAddress || "",
+        phone: p.nationalPhoneNumber || "",
+        rating: p.rating || null,
+        ratingCount: p.userRatingCount || null,
+        saturday: (p.regularOpeningHours?.weekdayDescriptions || []).some(d => d.startsWith("Saturday") && !d.includes("Closed")),
+      })).filter(c => c.name && c.address);
+      if (list.length === 0) { setError("No clinics found for that ZIP. Try a nearby ZIP code."); return; }
+      setClinics(list); setStep(2); window.scrollTo(0,0);
+    } catch (e) {
+      setError("Couldn't load clinics. Check your connection and try again.");
+    } finally { setLoading(false); }
+  }
+
+  function pickClinic(c) { setChosen(c); setStep(3); window.scrollTo(0,0); }
+  function pickManual() {
+    if (!manualName.trim()) { setError("Enter the clinic name first."); return; }
+    setError(""); setChosen({ name: manualName.trim(), address: "" }); setStep(3); window.scrollTo(0,0);
+  }
+
+  function confirmationMessage() {
+    return [
+      "Hi - this is regarding my physical therapy referral" + (reason ? " for " + reason : "") + ".",
+      "",
+      "I scheduled my first PT appointment:",
+      "- Clinic: " + (chosen?.name || "(clinic name)"),
+      chosen?.address ? "- Address: " + chosen.address : null,
+      chosen?.phone ? "- Clinic phone: " + chosen.phone : null,
+      "- First visit: " + (apptDate || "(date/time)"),
+      faxNumber ? "- Clinic fax for the referral: " + faxNumber : "- Clinic fax: (I can get this from the clinic if needed)",
+      "",
+      "Please send the referral/prescription if the clinic needs it. Thank you!",
+    ].filter(l => l !== null).join("\n");
+  }
+
+  async function copyMessage() {
+    try { await navigator.clipboard.writeText(confirmationMessage()); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch (e) { setCopied(false); }
+  }
+
+  const stepLabel = ["Your info","Find & call","Tell your provider"];
+
+  const clinicCard = (c) => (
+    <section key={c.name + c.address} style={{...cardStyle, border: isPreferred(c) ? "2px solid " + T.pine : cardStyle.border}}>
+      {isPreferred(c) && <span style={badgeStyle}>★ Works directly with your care team</span>}
+      <h3 style={{fontFamily:FONT, fontSize:16, fontWeight:600, margin:0}}>{c.name}</h3>
+      <p style={{margin:"6px 0", fontSize:14, color:T.sub}}>{c.address}</p>
+      <p style={{margin:"0 0 10px", fontSize:14}}>
+        {c.rating ? c.rating + "★ (" + c.ratingCount + " reviews)" : ""}
+        {c.rating && c.saturday ? " · " : ""}
+        {c.saturday ? "Open Saturdays" : ""}
+      </p>
+      <div style={{display:"flex", gap:8}}>
+        {c.phone && <a href={"tel:" + c.phone.replace(/[^\d]/g,"")} style={{...primaryBtn, marginTop:0, textDecoration:"none", textAlign:"center", flex:1.3, display:"block"}}>Call {c.phone}</a>}
+        <button onClick={() => pickClinic(c)} style={{...secondaryBtn, flex:1}}>I booked here</button>
+      </div>
+    </section>
+  );
+
+  return (
+    <div style={{minHeight:"100vh"}}>
+      <header style={{background:T.pineDark, color:"#fff", padding:"18px 20px 16px"}}>
+        <div style={{maxWidth:560, margin:"0 auto", display:"flex", alignItems:"center", gap:12}}>
+          <svg width="34" height="45" viewBox="0 0 180 240" style={{flexShrink:0}}>
+            <path d="M90 4C139 4 179 44 179 93 179 154 90 234 90 234 90 234 1 154 1 93 1 44 41 4 90 4Z" fill="#357C5C"/>
+            <circle cx="90" cy="90" r="60" fill="#F4F7F5"/>
+            <circle cx="82" cy="52" r="12" fill="#2E6B4F"/>
+            <g fill="none" stroke="#2E6B4F" strokeWidth="11" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M76 70L98 96"/><path d="M98 78L119 70"/><path d="M84 76L66 84"/><path d="M98 96L112 122"/><path d="M98 96L74 116"/>
+            </g>
+          </svg>
+          <div>
+            <h1 style={{fontFamily:FONT, fontWeight:700, fontSize:22, margin:0}}>PhysioFind</h1>
+            <p style={{margin:"2px 0 0", fontSize:14, opacity:.85}}>Find PT near you, confirm insurance, and let {PROVIDER_NAME} know you're booked.</p>
+          </div>
+        </div>
+      </header>
+
+      <nav style={{maxWidth:560, margin:"0 auto", padding:"16px 20px 0", display:"flex", gap:8}}>
+        {stepLabel.map((label, i) => {
+          const n = i+1, active = step===n, done = step>n;
+          return (
+            <div key={label} style={{flex:1}}>
+              <div style={{height:6, borderRadius:99, background: done||active ? T.pine : T.line}} />
+              <div style={{marginTop:6, fontSize:12, fontWeight:600, color: active ? T.pineDark : T.sub}}>{n}. {label}</div>
+            </div>
+          );
+        })}
+      </nav>
+
+      <main style={{maxWidth:560, margin:"0 auto", padding:"16px 20px 40px"}}>
+        {step===1 && (
+          <section style={cardStyle}>
+            <h2 style={h2Style}>Let's get you set up</h2>
+            <label style={labelStyle} htmlFor="zip">Your ZIP code</label>
+            <input id="zip" inputMode="numeric" maxLength={5} value={zip} onChange={e => setZip(e.target.value.replace(/\D/g,""))} placeholder="e.g. 02118" style={inputStyle} />
+            <label style={labelStyle}>Your insurance</label>
+            <div style={{display:"flex", flexWrap:"wrap", gap:8, marginBottom:8}}>
+              {INSURANCES.map(name => (
+                <button key={name} onClick={() => setInsurance(name)} style={{...chipStyle, background: insurance===name ? T.pine : "#fff", color: insurance===name ? "#fff" : T.ink, borderColor: insurance===name ? T.pine : T.line}}>{name}</button>
+              ))}
+            </div>
+            <input value={insurance} onChange={e => setInsurance(e.target.value)} placeholder="Or type your exact plan name" style={inputStyle} />
+            <label style={labelStyle} htmlFor="reason">What is PT for? (optional)</label>
+            <input id="reason" value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. right knee, after shoulder surgery" style={inputStyle} />
+            {error && <p style={errorStyle}>{error}</p>}
+            <button onClick={findClinics} disabled={loading} style={{...primaryBtn, background: loading ? "#7FA491" : T.pine}}>{loading ? "Searching near you..." : "Show PT clinics near me"}</button>
+            <p style={{fontSize:13, color:T.sub, margin:"10px 0 0"}}>Only your ZIP code is used to search. Nothing about you is saved.</p>
+          </section>
+        )}
+
+        {step===2 && (
+          <React.Fragment>
+            <section style={{...cardStyle, background:T.amberBg, border:"1px solid #E8D9B8"}}>
+              <p style={{margin:0, fontSize:14}}><strong style={{color:T.amber}}>Always confirm by phone.</strong> Insurance lists online are often out of date. When you call, ask if they accept <strong>{insurance || "your plan"}</strong> before booking.</p>
+            </section>
+            <section style={cardStyle}>
+              <h3 style={{...h2Style, fontSize:16}}>What to ask when you call</h3>
+              <ol style={{margin:0, paddingLeft:20, fontSize:15, lineHeight:1.6}}>{CALL_SCRIPT.map(q => <li key={q} style={{marginBottom:6}}>{q}</li>)}</ol>
+            </section>
+            {preferred.length > 0 && (
+              <React.Fragment>
+                <h2 style={{...h2Style, margin:"18px 0 4px"}}>Recommended clinics</h2>
+                <p style={{fontSize:14, color:T.sub, margin:"0 0 10px"}}>These coordinate directly with {PROVIDER_NAME}, which makes referrals smoother.</p>
+                {preferred.map(clinicCard)}
+              </React.Fragment>
+            )}
+            <h2 style={{...h2Style, margin:"18px 0 10px"}}>{preferred.length > 0 ? "More clinics" : "Clinics"} near {zip}</h2>
+            {others.map(clinicCard)}
+            <section style={cardStyle}>
+              <h3 style={{...h2Style, fontSize:16}}>Booked somewhere else?</h3>
+              <input value={manualName} onChange={e => setManualName(e.target.value)} placeholder="Type the clinic name" style={inputStyle} />
+              {error && <p style={errorStyle}>{error}</p>}
+              <button onClick={pickManual} style={primaryBtn}>Use this clinic</button>
+            </section>
+            <button onClick={() => { setError(""); setStep(1); }} style={linkBtn}>← Change my info</button>
+          </React.Fragment>
+        )}
+
+        {step===3 && chosen && (
+          <React.Fragment>
+            <section style={cardStyle}>
+              <h2 style={h2Style}>Great - you booked at {chosen.name}</h2>
+              <p style={{fontSize:15, margin:"0 0 14px"}}>Last step: send this message to {PROVIDER_NAME} (for example, through your patient portal) so they can fax your referral and mark PT as scheduled.</p>
+              <label style={labelStyle} htmlFor="appt">First appointment date & time</label>
+              <input id="appt" value={apptDate} onChange={e => setApptDate(e.target.value)} placeholder="e.g. Tue July 14, 2:30 PM" style={inputStyle} />
+              <label style={labelStyle} htmlFor="fax">Clinic fax number (ask the clinic)</label>
+              <input id="fax" value={faxNumber} onChange={e => setFaxNumber(e.target.value)} placeholder="e.g. (617) 555-0142" style={inputStyle} />
+              <div style={{background:T.bg, border:"1px solid " + T.line, borderRadius:10, padding:14, fontSize:14, whiteSpace:"pre-wrap", marginBottom:12, marginTop:12}}>{confirmationMessage()}</div>
+              <button onClick={copyMessage} style={primaryBtn}>{copied ? "Copied ✓" : "Copy message to send"}</button>
+              <p style={{fontSize:13, color:T.sub, margin:"10px 0 0"}}>Paste it into a portal message to {PROVIDER_NAME}.</p>
+            </section>
+            <button onClick={() => setStep(2)} style={linkBtn}>← Back to clinics</button>
+          </React.Fragment>
+        )}
+
+        <footer style={{marginTop:24, fontSize:12, color:T.sub, lineHeight:1.5}}>Clinic details come from a live search and may be incomplete - always confirm insurance, availability, and fax numbers directly with the clinic. This tool does not collect or store personal health information.</footer>
+      </main>
+    </div>
+  );
+}
+
+const cardStyle = { background:"#fff", border:"1px solid #DCE5E0", borderRadius:14, padding:18, marginBottom:14 };
+const h2Style = { fontFamily:FONT, fontSize:18, fontWeight:600, margin:"0 0 12px", color:T.ink };
+const labelStyle = { display:"block", fontSize:13, fontWeight:600, color:T.sub, margin:"10px 0 6px" };
+const inputStyle = { width:"100%", padding:"12px 14px", fontSize:16, border:"1px solid " + T.line, borderRadius:10, background:"#fff" };
+const chipStyle = { padding:"8px 12px", fontSize:14, fontWeight:600, border:"1px solid", borderRadius:99, cursor:"pointer" };
+const errorStyle = { color:"#9A3412", fontSize:14, margin:"4px 0 8px" };
+const badgeStyle = { display:"inline-block", background:T.pine, color:"#fff", fontSize:12, fontWeight:600, borderRadius:99, padding:"3px 10px", marginBottom:8 };
+const primaryBtn = { width:"100%", padding:"14px 16px", fontSize:16, fontWeight:600, fontFamily:FONT, color:"#fff", background:T.pine, border:"none", borderRadius:10, cursor:"pointer", marginTop:8 };
+const secondaryBtn = { padding:"14px 16px", fontSize:15, fontWeight:600, fontFamily:FONT, color:T.pine, background:"#fff", border:"2px solid " + T.pine, borderRadius:10, cursor:"pointer" };
+const linkBtn = { background:"none", border:"none", color:T.pine, fontSize:15, fontWeight:600, cursor:"pointer", padding:"8px 0" };
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
