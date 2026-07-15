@@ -58,7 +58,7 @@ return PARTNER_NETWORKS.some(net => name.includes(" " + net.toLowerCase().trim()
 // Published accepted-plan data for partner clinics (major MA plans matching our list).
 // Source: each clinic's own insurance page. Data can change - always confirm by phone.
 const PARTNER_INFO = [
-{ tokens:["ati"], name:"ATI Physical Therapy", url:"https://www.atipt.com/new-patients/insurance/", accepts:["MassHealth","Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Mass General Brigham Health Plan","Fallon Health","UnitedHealthcare","Aetna","Cigna"] },
+{ tokens:["ati"], name:"ATI Physical Therapy", url:"https://www.atipt.com/new-patients/insurance/", schedule:"https://appointments.atipt.com/", accepts:["MassHealth","Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Mass General Brigham Health Plan","Fallon Health","UnitedHealthcare","Aetna","Cigna"] },
 { tokens:["baystate","bay state"], name:"Bay State Physical Therapy", url:"https://baystatept.com/patient-information/insurances-we-accept/", schedule:"https://baystatept.com/request-an-appointment-navigation-bar/", accepts:["MassHealth","Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Tufts Health Plan","Mass General Brigham Health Plan","WellSense Health Plan","Fallon Health","UnitedHealthcare","Aetna","Cigna"] },
 ];
 const getPartnerInfo = (clinicName) => {
