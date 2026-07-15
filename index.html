@@ -60,6 +60,7 @@ return PARTNER_NETWORKS.some(net => name.includes(" " + net.toLowerCase().trim()
 const PARTNER_INFO = [
 { tokens:["ati"], name:"ATI Physical Therapy", url:"https://www.atipt.com/new-patients/insurance/", schedule:"https://appointments.atipt.com/", accepts:["MassHealth","Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Mass General Brigham Health Plan","Fallon Health","UnitedHealthcare","Aetna","Cigna"] },
 { tokens:["baystate","bay state"], name:"Bay State Physical Therapy", url:"https://baystatept.com/patient-information/insurances-we-accept/", schedule:"https://baystatept.com/request-an-appointment-navigation-bar/", accepts:["MassHealth","Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Tufts Health Plan","Mass General Brigham Health Plan","WellSense Health Plan","Fallon Health","UnitedHealthcare","Aetna","Cigna"] },
+{ tokens:["boston university physical therapy"], name:"Boston University Physical Therapy Center (Ryan Center)", url:"https://www.bu.edu/rehab/scheduling-your-appointment/insurance/", accepts:["Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Tufts Health Plan","Mass General Brigham Health Plan","UnitedHealthcare","Aetna","Cigna"] },
 ];
 const getPartnerInfo = (clinicName) => {
 const name = " " + (clinicName || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() + " ";
