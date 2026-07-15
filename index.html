@@ -58,13 +58,26 @@ return PARTNER_NETWORKS.some(net => name.includes(" " + net.toLowerCase().trim()
 // Published accepted-plan data for partner clinics (major MA plans matching our list).
 // Source: each clinic's own insurance page. Data can change - always confirm by phone.
 const PARTNER_INFO = [
-{ tokens:["ati"], name:"ATI Physical Therapy", url:"https://www.atipt.com/new-patients/insurance/", schedule:"https://appointments.atipt.com/", accepts:["MassHealth","Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Mass General Brigham Health Plan","Fallon Health","UnitedHealthcare","Aetna","Cigna"] },
-{ tokens:["baystate","bay state"], name:"Bay State Physical Therapy", url:"https://baystatept.com/patient-information/insurances-we-accept/", schedule:"https://baystatept.com/request-an-appointment-navigation-bar/", accepts:["MassHealth","Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Tufts Health Plan","Mass General Brigham Health Plan","WellSense Health Plan","Fallon Health","UnitedHealthcare","Aetna","Cigna"] },
+{ tokens:["ati"], name:"ATI Physical Therapy", url:"https://www.atipt.com/new-patients/insurance/", accepts:["MassHealth","Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Mass General Brigham Health Plan","Fallon Health","UnitedHealthcare","Aetna","Cigna"] },
+{ tokens:["baystate","bay state"], name:"Bay State Physical Therapy", url:"https://baystatept.com/patient-information/insurances-we-accept/", accepts:["MassHealth","Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Tufts Health Plan","Mass General Brigham Health Plan","WellSense Health Plan","Fallon Health","UnitedHealthcare","Aetna","Cigna"] },
 { tokens:["boston university physical therapy"], name:"Boston University Physical Therapy Center (Ryan Center)", url:"https://www.bu.edu/rehab/scheduling-your-appointment/insurance/", accepts:["Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Tufts Health Plan","Mass General Brigham Health Plan","UnitedHealthcare","Aetna","Cigna"] },
 ];
 const getPartnerInfo = (clinicName) => {
 const name = " " + (clinicName || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() + " ";
 return PARTNER_INFO.find(p => p.tokens.some(t => name.includes(" " + t.toLowerCase() + " "))) || null;
+};
+
+// PT providers with an online appointment-request form (button shows on any matching clinic).
+const SCHEDULE_LINKS = [
+{ tokens:["ati"], url:"https://appointments.atipt.com/" },
+{ tokens:["baystate","bay state"], url:"https://baystatept.com/request-an-appointment-navigation-bar/" },
+{ tokens:["professional physical therapy","professional pt"], url:"https://www.professionalpt.com/request-appointment/" },
+{ tokens:["select physical therapy"], url:"https://www.selectphysicaltherapy.com/contact/request-an-appointment/" },
+];
+const getScheduleUrl = (clinicName) => {
+const name = " " + (clinicName || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() + " ";
+const hit = SCHEDULE_LINKS.find(s => s.tokens.some(t => name.includes(" " + t.toLowerCase() + " ")));
+return hit ? hit.url : null;
 };
 
 function App() {
@@ -170,6 +183,7 @@ return (
 </div>
 );
 })()}
+{getScheduleUrl(c.name) && <a href={getScheduleUrl(c.name)} target="_blank" rel="noopener noreferrer" style={{...primaryBtn, marginTop:0, marginBottom:8, textDecoration:"none", textAlign:"center", display:"block"}}>Book appointment online ↗</a>}
 <div style={{display:"flex", gap:8}}>
 {c.phone && <a href={"tel:" + c.phone.replace(/[^\d]/g,"")} style={{...primaryBtn, marginTop:0, textDecoration:"none", textAlign:"center", flex:1.3, display:"block"}}>Call {c.phone}</a>}
 <button onClick={() => pickClinic(c)} style={{...secondaryBtn, flex:1}}>I booked here</button>
