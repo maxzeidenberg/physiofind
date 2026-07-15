@@ -97,27 +97,7 @@ const [copied, setCopied] = useState(false);
 const preferred = clinics.filter(isPreferred);
 const others = clinics.filter(c => !isPreferred(c));
 
-async function findClinics() {
-const z = zip.trim();
-if (!/^\d{5}$/.test(z)) { setError("Enter a 5-digit ZIP code."); return; }
-setError(""); setLoading(true);
-try {
-// Resolve the ZIP to coordinates first, then bias the clinic search to that area.
-// Without this, a plain text search drifts toward big cities (e.g. Boston) for
-// smaller towns, showing clinics far from the patient.
-let locationBias;
-try {
-const geo = await fetch("https://places.googleapis.com/v1/places:searchText", {
-method: "POST",
-headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_API_KEY, "X-Goog-FieldMask": "places.location" },
-body: JSON.stringify({ textQuery: z + " USA", maxResultCount: 1 }),
-});
-const gd = await geo.json();
-const loc = gd.places && gd.places[0] && gd.places[0].location;
-if (loc) locationBias = { circle: { center: loc, radius: 40000 } };
-} catch (e) {}
-const searchBody = { textQuery: "outpatient physical therapy clinic near " + z, maxResultCount: 12 };
-if (locationBias) searchBody.locationBias = locationBias;
+async function searchAt(loc) {
 const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
 method: "POST",
 headers: {
@@ -125,9 +105,9 @@ headers: {
 "X-Goog-Api-Key": GOOGLE_API_KEY,
 "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.regularOpeningHours.weekdayDescriptions,places.rating,places.userRatingCount",
 },
-body: JSON.stringify(searchBody),
+body: JSON.stringify({ textQuery: "outpatient physical therapy clinic", maxResultCount: 12, locationBias: { circle: { center: loc, radius: 40000 } } }),
 });
-if (!res.ok) { setError("Clinic lookup failed. Double-check the ZIP and try again."); return; }
+if (!res.ok) { setError("Clinic lookup failed. Please try again."); return; }
 const data = await res.json();
 const list = (data.places || []).map(p => ({
 name: p.displayName?.text || "",
@@ -137,11 +117,42 @@ rating: p.rating || null,
 ratingCount: p.userRatingCount || null,
 saturday: (p.regularOpeningHours?.weekdayDescriptions || []).some(d => d.startsWith("Saturday") && !d.includes("Closed")),
 })).filter(c => c.name && c.address);
-if (list.length === 0) { setError("No clinics found for that ZIP. Try a nearby ZIP code."); return; }
+if (list.length === 0) { setError("No clinics found nearby. Try a different ZIP or address."); return; }
 setClinics(list); setStep(2); window.scrollTo(0,0);
+}
+
+async function findClinics() {
+const q = zip.trim();
+if (!q) { setError("Enter a ZIP code or address, or tap Use my location."); return; }
+setError(""); setLoading(true);
+try {
+// Turn the typed ZIP or address into coordinates, then search around that point.
+const geo = await fetch("https://places.googleapis.com/v1/places:searchText", {
+method: "POST",
+headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_API_KEY, "X-Goog-FieldMask": "places.location" },
+body: JSON.stringify({ textQuery: q + " USA", maxResultCount: 1 }),
+});
+const gd = await geo.json();
+const loc = gd.places && gd.places[0] && gd.places[0].location;
+if (!loc) { setError("Couldn't find that place. Try a ZIP code or a nearby town."); return; }
+await searchAt(loc);
 } catch (e) {
 setError("Couldn't load clinics. Check your connection and try again.");
 } finally { setLoading(false); }
+}
+
+function useMyLocation() {
+if (!navigator.geolocation) { setError("Location isn't available on this device. Enter a ZIP or address."); return; }
+setError(""); setLoading(true);
+navigator.geolocation.getCurrentPosition(
+async (pos) => {
+try { await searchAt({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }); }
+catch (e) { setError("Couldn't load clinics. Please try again."); }
+finally { setLoading(false); }
+},
+() => { setLoading(false); setError("Couldn't get your location. Enter a ZIP or address instead."); },
+{ enableHighAccuracy: false, timeout: 10000 }
+);
 }
 
 function pickClinic(c) { setChosen(c); setStep(3); window.scrollTo(0,0); }
@@ -233,8 +244,9 @@ return (
 {step===1 && (
 <section style={cardStyle}>
 <h2 style={h2Style}>Let's get you set up</h2>
-<label style={labelStyle} htmlFor="zip">Your ZIP code</label>
-<input id="zip" inputMode="numeric" maxLength={5} value={zip} onChange={e => setZip(e.target.value.replace(/\D/g,""))} placeholder="e.g. 02118" style={inputStyle} />
+<label style={labelStyle} htmlFor="zip">Your ZIP code or address</label>
+<input id="zip" value={zip} onChange={e => setZip(e.target.value)} onKeyDown={e => { if (e.key === "Enter") findClinics(); }} placeholder="e.g. 02118 or 350 Main St, Hyannis" style={inputStyle} />
+<button onClick={useMyLocation} disabled={loading} style={{...secondaryBtn, width:"100%", marginTop:8, textAlign:"center"}}>◎ Use my current location</button>
 <label style={labelStyle}>Your insurance</label>
 <div style={{display:"flex", flexWrap:"wrap", gap:8, marginBottom:8}}>
 {INSURANCES.map(name => (
@@ -246,7 +258,7 @@ return (
 <input id="reason" value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. right knee, after shoulder surgery" style={inputStyle} />
 {error && <p style={errorStyle}>{error}</p>}
 <button onClick={findClinics} disabled={loading} style={{...primaryBtn, background: loading ? "#8AA8BE" : T.pine}}>{loading ? "Searching near you..." : "Show PT clinics near me"}</button>
-<p style={{fontSize:13, color:T.sub, margin:"10px 0 0"}}>Only your ZIP code is used to search. Nothing about you is saved.</p>
+<p style={{fontSize:13, color:T.sub, margin:"10px 0 0"}}>Only your location is used to search. Nothing about you is saved.</p>
 </section>
 )}
 
@@ -266,7 +278,7 @@ return (
 {preferred.map(clinicCard)}
 </React.Fragment>
 )}
-<h2 style={{...h2Style, margin:"18px 0 10px"}}>{preferred.length > 0 ? "More clinics" : "Clinics"} near {zip}</h2>
+<h2 style={{...h2Style, margin:"18px 0 10px"}}>{preferred.length > 0 ? "More clinics" : "Clinics"} near you</h2>
 {others.map(clinicCard)}
 <section style={cardStyle}>
 <h3 style={{...h2Style, fontSize:16}}>Booked somewhere else?</h3>
