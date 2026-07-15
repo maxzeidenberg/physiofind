@@ -55,6 +55,17 @@ const name = " " + (c.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim
 return PARTNER_NETWORKS.some(net => name.includes(" " + net.toLowerCase().trim() + " "));
 };
 
+// Published accepted-plan data for partner clinics (major MA plans matching our list).
+// Source: each clinic's own insurance page. Data can change - always confirm by phone.
+const PARTNER_INFO = [
+{ tokens:["ati"], name:"ATI Physical Therapy", url:"https://www.atipt.com/new-patients/insurance/", accepts:["MassHealth","Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Mass General Brigham Health Plan","Fallon Health","UnitedHealthcare","Aetna","Cigna"] },
+{ tokens:["baystate","bay state"], name:"Bay State Physical Therapy", url:"https://baystatept.com/patient-information/insurances-we-accept/", accepts:["MassHealth","Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Tufts Health Plan","Mass General Brigham Health Plan","WellSense Health Plan","Fallon Health","UnitedHealthcare","Aetna","Cigna"] },
+];
+const getPartnerInfo = (clinicName) => {
+const name = " " + (clinicName || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() + " ";
+return PARTNER_INFO.find(p => p.tokens.some(t => name.includes(" " + t.toLowerCase() + " "))) || null;
+};
+
 function App() {
 const [step, setStep] = useState(1);
 const [zip, setZip] = useState("");
@@ -140,6 +151,23 @@ const clinicCard = (c) => (
 {c.rating && c.saturday ? " · " : ""}
 {c.saturday ? "Open Saturdays" : ""}
 </p>
+{(() => {
+const info = getPartnerInfo(c.name);
+if (!info) return null;
+const sel = insurance.trim();
+const accepted = sel && info.accepts.some(p => p.toLowerCase() === sel.toLowerCase());
+return (
+<div style={{background:T.bg, border:"1px solid " + T.line, borderRadius:10, padding:"10px 12px", margin:"0 0 12px"}}>
+{sel && accepted && <p style={{margin:0, fontSize:13, fontWeight:600, color:T.pine}}>✓ Lists {sel} as accepted — confirm when you call.</p>}
+{sel && !accepted && <p style={{margin:0, fontSize:13, fontWeight:600, color:T.amber}}>{sel} isn't on their published list — ask when you call.</p>}
+<details style={{marginTop: sel ? 8 : 0}}>
+<summary style={{fontSize:13, fontWeight:600, color:T.ink, cursor:"pointer"}}>Accepted insurance (major MA plans)</summary>
+<p style={{margin:"6px 0 4px", fontSize:13, color:T.sub, lineHeight:1.5}}>{info.accepts.join(" · ")}</p>
+<a href={info.url} target="_blank" rel="noopener noreferrer" style={{fontSize:13, fontWeight:600, color:T.pine, textDecoration:"none"}}>See {info.name}'s full list ↗</a>
+</details>
+</div>
+);
+})()}
 <div style={{display:"flex", gap:8}}>
 {c.phone && <a href={"tel:" + c.phone.replace(/[^\d]/g,"")} style={{...primaryBtn, marginTop:0, textDecoration:"none", textAlign:"center", flex:1.3, display:"block"}}>Call {c.phone}</a>}
 <button onClick={() => pickClinic(c)} style={{...secondaryBtn, flex:1}}>I booked here</button>
