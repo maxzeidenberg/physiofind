@@ -59,7 +59,7 @@ return PARTNER_NETWORKS.some(net => name.includes(" " + net.toLowerCase().trim()
 // Source: each clinic's own insurance page. Data can change - always confirm by phone.
 const PARTNER_INFO = [
 { tokens:["ati"], name:"ATI Physical Therapy", url:"https://www.atipt.com/new-patients/insurance/", accepts:["MassHealth","Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Mass General Brigham Health Plan","Fallon Health","UnitedHealthcare","Aetna","Cigna"] },
-{ tokens:["baystate","bay state"], name:"Bay State Physical Therapy", url:"https://baystatept.com/patient-information/insurances-we-accept/", accepts:["MassHealth","Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Tufts Health Plan","Mass General Brigham Health Plan","WellSense Health Plan","Fallon Health","UnitedHealthcare","Aetna","Cigna"] },
+{ tokens:["baystate","bay state"], name:"Bay State Physical Therapy", url:"https://baystatept.com/patient-information/insurances-we-accept/", schedule:"https://baystatept.com/request-an-appointment-navigation-bar/", accepts:["MassHealth","Medicare","Blue Cross Blue Shield","Harvard Pilgrim","Tufts Health Plan","Mass General Brigham Health Plan","WellSense Health Plan","Fallon Health","UnitedHealthcare","Aetna","Cigna"] },
 ];
 const getPartnerInfo = (clinicName) => {
 const name = " " + (clinicName || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() + " ";
@@ -160,7 +160,8 @@ return (
 <div style={{background:T.bg, border:"1px solid " + T.line, borderRadius:10, padding:"10px 12px", margin:"0 0 12px"}}>
 {sel && accepted && <p style={{margin:0, fontSize:13, fontWeight:600, color:T.pine}}>✓ Lists {sel} as accepted — confirm when you call.</p>}
 {sel && !accepted && <p style={{margin:0, fontSize:13, fontWeight:600, color:T.amber}}>{sel} isn't on their published list — ask when you call.</p>}
-<details style={{marginTop: sel ? 8 : 0}}>
+{info.schedule && <a href={info.schedule} target="_blank" rel="noopener noreferrer" style={{display:"inline-block", marginTop: sel ? 8 : 0, fontSize:14, fontWeight:600, color:"#fff", background:T.pine, padding:"8px 12px", borderRadius:8, textDecoration:"none"}}>Book appointment online ↗</a>}
+<details style={{marginTop:8}}>
 <summary style={{fontSize:13, fontWeight:600, color:T.ink, cursor:"pointer"}}>Accepted insurance (major MA plans)</summary>
 <p style={{margin:"6px 0 4px", fontSize:13, color:T.sub, lineHeight:1.5}}>{info.accepts.join(" · ")}</p>
 <a href={info.url} target="_blank" rel="noopener noreferrer" style={{fontSize:13, fontWeight:600, color:T.pine, textDecoration:"none"}}>See {info.name}'s full list ↗</a>
