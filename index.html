@@ -47,7 +47,7 @@ const CALL_SCRIPT = [
 
 const params = new URLSearchParams(window.location.search);
 const PROVIDER_NAME = params.get("provider") || "your provider's office";
-const DEFAULT_PARTNERS = ["ATI", "Spaulding", "Baystate", "Bay State", "BMC", "Boston Medical Center"];
+const DEFAULT_PARTNERS = ["ATI", "Baystate", "Bay State", "BMC", "Boston Medical Center"];
 const PARTNER_NETWORKS = [...DEFAULT_PARTNERS, ...(params.get("partners") || "").split(",").map(s => s.trim()).filter(Boolean)];
 // Whole-word match so e.g. "ATI" doesn't falsely match "rehabilitATIon".
 const isPreferred = (c) => {
