@@ -60,11 +60,11 @@ const CALL_SCRIPT = [
 
 const params = new URLSearchParams(window.location.search);
 const PROVIDER_NAME = params.get("provider") || "your provider's office";
-const DEFAULT_PARTNERS = ["ATI", "Baystate", "Bay State", "BMC", "Boston Medical Center", "Boston University Physical Therapy"];
+const DEFAULT_PARTNERS = ["ATI", "Baystate", "Bay State", "Boston University Physical Therapy"];
 const PARTNER_NETWORKS = [...DEFAULT_PARTNERS, ...(params.get("partners") || "").split(",").map(s => s.trim()).filter(Boolean)];
 // Partner chains searched for explicitly so their nearby locations always appear,
 // even when they aren't in the general top results.
-const PARTNER_QUERIES = ["ATI Physical Therapy", "Bay State Physical Therapy", "Boston Medical Center Physical Therapy", "Boston University Physical Therapy"];
+const PARTNER_QUERIES = ["ATI Physical Therapy", "Bay State Physical Therapy", "Boston University Physical Therapy"];
 // Whole-word match so e.g. "ATI" doesn't falsely match "rehabilitATIon".
 const isPreferred = (c) => {
 const name = " " + (c.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() + " ";
