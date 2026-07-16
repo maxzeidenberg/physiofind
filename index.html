@@ -62,6 +62,9 @@ const params = new URLSearchParams(window.location.search);
 const PROVIDER_NAME = params.get("provider") || "your provider's office";
 const DEFAULT_PARTNERS = ["ATI", "Baystate", "Bay State", "BMC", "Boston Medical Center", "Boston University Physical Therapy"];
 const PARTNER_NETWORKS = [...DEFAULT_PARTNERS, ...(params.get("partners") || "").split(",").map(s => s.trim()).filter(Boolean)];
+// Partner chains searched for explicitly so their nearby locations always appear,
+// even when they aren't in the general top results.
+const PARTNER_QUERIES = ["ATI Physical Therapy", "Bay State Physical Therapy", "Boston Medical Center Physical Therapy", "Boston University Physical Therapy"];
 // Whole-word match so e.g. "ATI" doesn't falsely match "rehabilitATIon".
 const isPreferred = (c) => {
 const name = " " + (c.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() + " ";
@@ -111,27 +114,54 @@ const preferred = clinics.filter(isPreferred);
 const others = clinics.filter(c => !isPreferred(c));
 
 async function searchAt(loc) {
+const RADIUS = 40000;
+const MASK = "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.regularOpeningHours.weekdayDescriptions,places.rating,places.userRatingCount,places.location";
+async function textSearch(q, max) {
 const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
 method: "POST",
-headers: {
-"Content-Type": "application/json",
-"X-Goog-Api-Key": GOOGLE_API_KEY,
-"X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.regularOpeningHours.weekdayDescriptions,places.rating,places.userRatingCount",
-},
-body: JSON.stringify({ textQuery: "outpatient physical therapy clinic", maxResultCount: 12, locationBias: { circle: { center: loc, radius: 40000 } } }),
+headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_API_KEY, "X-Goog-FieldMask": MASK },
+body: JSON.stringify({ textQuery: q, maxResultCount: max, locationBias: { circle: { center: loc, radius: RADIUS } } }),
 });
-if (!res.ok) { setError("Clinic lookup failed. Please try again."); return; }
+if (!res.ok) return [];
 const data = await res.json();
-const list = (data.places || []).map(p => ({
+return data.places || [];
+}
+function distM(a, b) {
+const R = 6371000, toR = x => x * Math.PI / 180;
+const dLat = toR(b.latitude - a.latitude), dLng = toR(b.longitude - a.longitude);
+const s = Math.sin(dLat/2)**2 + Math.cos(toR(a.latitude)) * Math.cos(toR(b.latitude)) * Math.sin(dLng/2)**2;
+return 2 * R * Math.asin(Math.sqrt(s));
+}
+// General nearby clinics, plus targeted searches so partner chains (ATI, Bay State,
+// BMC, BU) reliably appear even when they aren't in the general top results.
+const results = await Promise.all([
+textSearch("outpatient physical therapy clinic", 20),
+...PARTNER_QUERIES.map(q => textSearch(q, 4)),
+]);
+if (!results[0].length && results.slice(1).every(r => !r.length)) { setError("Clinic lookup failed. Please try again."); return; }
+const general = results[0];
+const partners = results.slice(1).flat().filter(p => p.location && distM(loc, p.location) <= RADIUS);
+const toClinic = (p) => ({
 name: p.displayName?.text || "",
 address: p.formattedAddress || "",
 phone: p.nationalPhoneNumber || "",
 rating: p.rating || null,
 ratingCount: p.userRatingCount || null,
 saturday: (p.regularOpeningHours?.weekdayDescriptions || []).some(d => d.startsWith("Saturday") && !d.includes("Closed")),
-})).filter(c => c.name && c.address);
-if (list.length === 0) { setError("No clinics found nearby. Try a different ZIP or address."); return; }
-setClinics(list); setStep(2); window.scrollTo(0,0);
+});
+const seen = new Set();
+const all = [];
+for (const p of [...general, ...partners]) {
+const c = toClinic(p);
+if (!c.name || !c.address) continue;
+const key = (c.name + "|" + c.address).toLowerCase();
+if (seen.has(key)) continue;
+seen.add(key); all.push(c);
+}
+if (all.length === 0) { setError("No clinics found nearby. Try a different ZIP or address."); return; }
+const pref = all.filter(isPreferred);
+const rest = all.filter(c => !isPreferred(c)).slice(0, 12);
+setClinics([...pref, ...rest]); setStep(2); window.scrollTo(0,0);
 }
 
 async function findClinics() {
