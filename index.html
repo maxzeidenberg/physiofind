@@ -115,7 +115,7 @@ const others = clinics.filter(c => !isPreferred(c));
 
 async function searchAt(loc) {
 const RADIUS = 40000;
-const MASK = "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.regularOpeningHours.weekdayDescriptions,places.rating,places.userRatingCount,places.location";
+const MASK = "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.regularOpeningHours.weekdayDescriptions,places.rating,places.userRatingCount,places.location,places.websiteUri";
 async function textSearch(q, max) {
 const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
 method: "POST",
@@ -148,6 +148,7 @@ phone: p.nationalPhoneNumber || "",
 rating: p.rating || null,
 ratingCount: p.userRatingCount || null,
 saturday: (p.regularOpeningHours?.weekdayDescriptions || []).some(d => d.startsWith("Saturday") && !d.includes("Closed")),
+website: p.websiteUri || "",
 });
 const seen = new Set();
 const all = [];
@@ -236,6 +237,7 @@ const clinicCard = (c) => (
 {c.rating && c.saturday ? " · " : ""}
 {c.saturday ? "Open Saturdays" : ""}
 </p>
+{!getScheduleUrl(c.name) && c.website && <a href={c.website} target="_blank" rel="noopener noreferrer" style={{display:"inline-block", margin:"0 0 12px", fontSize:14, fontWeight:600, color:T.pine, textDecoration:"none"}}>Visit website ↗</a>}
 {(() => {
 const info = getPartnerInfo(c.name);
 if (!info) return null;
