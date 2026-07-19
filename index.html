@@ -115,7 +115,7 @@ const others = clinics.filter(c => !isPreferred(c));
 
 async function searchAt(loc) {
 const RADIUS = 40000;
-const MASK = "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.regularOpeningHours.weekdayDescriptions,places.rating,places.userRatingCount,places.location,places.websiteUri";
+const MASK = "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.regularOpeningHours.weekdayDescriptions,places.regularOpeningHours.openNow,places.rating,places.userRatingCount,places.location,places.websiteUri";
 async function textSearch(q, max) {
 const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
 method: "POST",
@@ -148,6 +148,8 @@ phone: p.nationalPhoneNumber || "",
 rating: p.rating || null,
 ratingCount: p.userRatingCount || null,
 saturday: (p.regularOpeningHours?.weekdayDescriptions || []).some(d => d.startsWith("Saturday") && !d.includes("Closed")),
+hours: p.regularOpeningHours?.weekdayDescriptions || [],
+openNow: p.regularOpeningHours?.openNow,
 website: p.websiteUri || "",
 });
 const seen = new Set();
@@ -237,6 +239,7 @@ const clinicCard = (c) => (
 {c.rating && c.saturday ? " · " : ""}
 {c.saturday ? "Open Saturdays" : ""}
 </p>
+{c.hours && c.hours.length > 0 && <details style={{margin:"0 0 12px"}}><summary style={{fontSize:14, fontWeight:600, color:T.ink, cursor:"pointer"}}>Hours{typeof c.openNow === "boolean" ? <span style={{color: c.openNow ? T.pine : T.amber, fontWeight:600}}> · {c.openNow ? "Open now" : "Closed now"}</span> : null}</summary><div style={{margin:"6px 0 0", fontSize:13, color:T.sub, lineHeight:1.6}}>{c.hours.map((d, i) => <div key={i}>{d}</div>)}</div></details>}
 {(() => {
 const info = getPartnerInfo(c.name);
 if (!info) return null;
